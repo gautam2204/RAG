@@ -19,3 +19,4 @@ if __name__ == "__main__":
     documents = DataIngestionObj.get_documents()
     chunked_documents = Chunking.split_documents(documents)
     print(f"Number of chunked documents: {len(chunked_documents)}")
+    print(len(documents), len(chunked_documents))
