@@ -1,5 +1,10 @@
 from typing import List
 from sentence_transformers import SentenceTransformer
+import os
+from DocsChunking import Chunking
+from LoadData import DataIngestion
+os.environ['TRANSFORMERS_OFFLINE'] = '1'
+os.environ['HF_HUB_OFFLINE'] = '1'
 
 class EmbeddingManager:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
@@ -27,11 +32,15 @@ class EmbeddingManager:
 
 
 if __name__ == "__main__":
-    manager = EmbeddingManager()
-    sample_texts = [
-        "Artificial Intelligence is transforming the world.",
-        "Sentence transformers are great for embeddings."
-    ]
-    embeddings = manager.generate_embeddings(sample_texts)
+    DataIngestionObj = DataIngestion(directory_path="./data")
+    documents = DataIngestionObj.get_documents()
+    chunked_documents = Chunking.split_documents(documents)
+    print(f"Number of chunked documents: {len(chunked_documents)}")
+    print(len(documents), len(chunked_documents))
+    
+    chunk_texts = [doc.page_content for doc in chunked_documents]
+    
+    manager = EmbeddingManager() 
+    embeddings = manager.generate_embeddings(chunk_texts)
     print(f"Generated {len(embeddings)} embeddings.")
     print("Shape of first embedding:", embeddings[0].shape)

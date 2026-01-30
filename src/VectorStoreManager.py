@@ -4,82 +4,84 @@ from typing import List
 
 import chromadb
 
+from DocsChunking import Chunking
 from EmbeddingManager import EmbeddingManager
 from langchain_core.documents import Document
 from sentence_transformers import SentenceTransformer
 
-
-class EmbeddingManager:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        """Initialize SentenceTransformer model."""
-        self.model = SentenceTransformer(model_name)
-
-    def generate_embeddings(self, texts: List[str]):
-        """Generate embeddings for a list of texts."""
-        return self.model.encode(texts, convert_to_numpy=True)
-
+from LoadData import DataIngestion
 
 class VectorStoreManager:
-    def __init__(self, persist_directory: str = "./chroma_db"):
-        """
-        Initialize Chroma vector store with persistent storage.
-        """
+    def __init__(self, collectiona_name="resumes_document",embeddings_list=None,persist_directory="../store/chroma_db"):
+        
+        # Create persistent directory if it doesn't exist
+        if not os.path.exists(persist_directory):
+            os.makedirs(persist_directory)
+        
+        self.collectiona_name = collectiona_name
+        self.embeddings_list = embeddings_list
         self.persist_directory = persist_directory
-        os.makedirs(self.persist_directory, exist_ok=True)
+        self.client = None
+        self.collection = None
+        self.collection = self.__initialize_store()
+    
+    def __initialize_store(self):
+        import chromadb
 
-        # Use custom SentenceTransformer embeddings
-        self.embedding_function = EmbeddingManager()
-
-        # Initialize Chroma
-        self.vector_store = chromadb.PersistentClient(
-            persist_directory=self.persist_directory,
-            embedding_function=self.embedding_function.model.encode  # pass the encode function
-        )
+        self.client = chromadb.PersistentClient(
+                path=self.persist_directory
+            )
+        self.collection = self.client.get_or_create_collection(
+            name=self.collectiona_name,
+            metadata={"description": "Resume Embeddings for RAG"},
+            )
+        
+        return self.collection
 
     def add_documents(self, documents: List[Document]):
+        
+        
         """
         Add LangChain Document objects to the vector store.
         Each document gets a UUID as its ID.
         """
+        if len(documents) != len(self.embeddings_list):
+            raise ValueError("Length of documents and embeddings must be equal.")
+        
         texts = [doc.page_content for doc in documents]
         metadatas = [doc.metadata for doc in documents]
         ids = [str(uuid.uuid4()) for _ in documents]
 
-        # Generate embeddings
-        embeddings_list = self.embedding_function.generate_embeddings(texts)
-
-        # Add to Chroma
-        self.vector_store.add_texts(
-            texts=texts,
+        # Add to Chroma vector store
+        self.collection.add(
+            documents=texts,
             metadatas=metadatas,
             ids=ids,
-            embeddings=embeddings_list
+            embeddings=self.embeddings_list
         )
 
         print(f"✅ Added {len(documents)} documents with UUIDs to vector store.")
-        return ids
 
     def get_vector_store(self):
         """Return the Chroma vector store instance."""
-        return self.vector_store
-
+        return self.collection
 
 if __name__ == "__main__":
     # Example usage
-    sample_doc = Document(
-        page_content="Skills WORK EXPERIENCE TIAA GBS 2021-Current Associate Specialist",
-        metadata={
-            "source": "./data/Gautam_Rawat_resume_07_25.pdf",
-            "page": 0,
-            "producer": "www.smallpdf.com"
-        }
-    )
+    DataIngestionObj = DataIngestion(directory_path="./data")
+    documents = DataIngestionObj.get_documents()
+    chunked_documents = Chunking.split_documents(documents)
+    print(f"Number of chunked documents: {len(chunked_documents)}")
+    print(len(documents), len(chunked_documents))
+    
+    chunk_texts = [doc.page_content for doc in chunked_documents]
+    
+    manager = EmbeddingManager() 
+    embeddings = manager.generate_embeddings(chunk_texts)
+    print(f"Generated {len(embeddings)} embeddings.")
+    print("Shape of first embedding:", embeddings[0].shape)
 
-    manager = VectorStoreManager(persist_directory="./chroma_db")
-    ids = manager.add_documents([sample_doc])
-    print("Generated UUIDs:", ids)
-
-    # Test retrieval
-    results = manager.get_vector_store().similarity_search("work experience", k=2)
-    for r in results:
-        print(r.page_content, r.metadata)
+    manager = VectorStoreManager(embeddings_list = embeddings,persist_directory="./store/")
+    manager.add_documents(chunked_documents)
+    print("Documents added to vector store.")
+    

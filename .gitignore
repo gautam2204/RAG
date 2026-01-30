@@ -9,3 +9,9 @@ wheels/
 # Virtual environments
 .venv
 data/vector_store/
+store/chroma.sqlite3
+store/7cb7a413-8511-4798-8f2a-27c1e180c23b/data_level0.bin
+store/7cb7a413-8511-4798-8f2a-27c1e180c23b/header.bin
+store/7cb7a413-8511-4798-8f2a-27c1e180c23b/length.bin
+store/7cb7a413-8511-4798-8f2a-27c1e180c23b/link_lists.bin
+.vscode/launch.json
