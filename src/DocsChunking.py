@@ -5,7 +5,7 @@ from LoadData import DataIngestion
 
 
 class Chunking:
-    def split_documents(documents, chunk_size=1000, chunk_overlap=200):   
+    def split_documents(documents, chunk_size=100, chunk_overlap=20):   
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
